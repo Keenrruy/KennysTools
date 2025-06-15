@@ -24,14 +24,8 @@ function App() {
   const [selectedForDelete, setSelectedForDelete] = useState([]);
   const [isPinned, setIsPinned] = useState(false); // For extension window pin
   const [bgImage, setBgImage] = useState(null);
-  const [bgDrag, setBgDrag] = useState(false);
-  const [bgOffset, setBgOffset] = useState({ x: 0, y: 0 });
-  const [bgTempOffset, setBgTempOffset] = useState({ x: 0, y: 0 });
-  const [bgDragStart, setBgDragStart] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const fileInputRef = useRef();
   const bgInputRef = useRef();
-  const bgContainerRef = useRef();
 
   // Load notes and background from IndexedDB on mount
   useEffect(() => {
@@ -42,9 +36,6 @@ function App() {
     get('bgImage').then(img => {
       if (img) setBgImage(img);
     });
-    get('bgOffset').then(offset => {
-      if (offset) setBgOffset(offset);
-    });
   }, []);
 
   // Save notes to IndexedDB whenever notes change
@@ -52,13 +43,10 @@ function App() {
     set('notes', notes);
   }, [notes]);
 
-  // Save background image and offset to IndexedDB
+  // Save background image to IndexedDB
   useEffect(() => {
     set('bgImage', bgImage);
   }, [bgImage]);
-  useEffect(() => {
-    set('bgOffset', bgOffset);
-  }, [bgOffset]);
 
   // Add a new empty note and select it
   const handleAddNote = () => {
@@ -122,43 +110,16 @@ function App() {
     bgInputRef.current.click();
   };
 
-  // Handle background image upload
+  // Handle background image upload (no drag/crop)
   const handleBgImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         setBgImage(ev.target.result);
-        setBgDrag(true);
-        setBgTempOffset(bgOffset); // Start with current offset
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  // Drag background image
-  const handleBgMouseDown = (e) => {
-    if (!bgDrag) return;
-    setBgDragStart({ x: e.clientX, y: e.clientY });
-  };
-  const handleBgMouseMove = (e) => {
-    if (!bgDrag || !bgDragStart) return;
-    const dx = e.clientX - bgDragStart.x;
-    const dy = e.clientY - bgDragStart.y;
-    setBgTempOffset({ x: bgOffset.x + dx, y: bgOffset.y + dy });
-  };
-  const handleBgMouseUp = () => {
-    if (!bgDrag) return;
-    setBgDragStart(null);
-  };
-  // Confirm/cancel background drag
-  const handleConfirmBgDrag = () => {
-    setBgOffset(bgTempOffset);
-    setBgDrag(false);
-  };
-  const handleCancelBgDrag = () => {
-    setBgTempOffset(bgOffset);
-    setBgDrag(false);
   };
 
   // Select a note
@@ -231,25 +192,6 @@ function App() {
         transition: 'background 0.3s'
       }}
     >
-      {/* Background drag overlay */}
-      {bgImage && bgDrag && (
-        <div
-          ref={bgContainerRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 100,
-            cursor: 'grab',
-            background: 'rgba(255,255,255,0.15)'
-          }}
-          onMouseDown={handleBgMouseDown}
-          onMouseMove={handleBgMouseMove}
-          onMouseUp={handleBgMouseUp}
-        />
-      )}
       {/* Top Bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 0 }}>
@@ -299,13 +241,6 @@ function App() {
             style={{ display: 'none' }}
             onChange={handleBgImageChange}
           />
-          {/* Background drag confirm/cancel */}
-          {bgDrag && (
-            <>
-              <button onClick={handleConfirmBgDrag} title="Confirm Background Position" style={{ ...topBarBtnStyle, color: 'green', border: '1.5px solid green' }}>✔️</button>
-              <button onClick={handleCancelBgDrag} title="Cancel Background Position" style={{ ...topBarBtnStyle, color: 'red', border: '1.5px solid red' }}>❌</button>
-            </>
-          )}
         </div>
         <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
           <button
@@ -378,6 +313,15 @@ function App() {
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 17.27 18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21 12 17.27" /></svg>
               )}
             </span>
+            {/* Delete mode checkbox */}
+            {deleteMode && (
+              <input
+                type="checkbox"
+                checked={selectedForDelete.includes(note.id)}
+                onChange={e => { e.stopPropagation(); handleSelectForDelete(note.id); }}
+                style={{ marginRight: 8, marginTop: 8 }}
+              />
+            )}
             {/* Note textarea */}
             <textarea
               value={note.text}
